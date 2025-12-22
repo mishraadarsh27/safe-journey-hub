@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check owner
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. User Profiles
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // 1.1 Trusted Contacts (Subcollection)
+      match /contacts/{contactId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // 2. Trips
+    match /trips/{tripId} {
+      // Create: Authenticated user can create if they are the owner in the data
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // key fields validation (optional but good practice)
+      // && request.resource.data.status == 'active';
+
+      // Read/Update: Owner only
+      allow read, update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // 3. SOS Alerts
+    match /sos_alerts/{alertId} {
+      // Create: Authenticated user can create
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Read: Owner only (for now, eventually trusted contacts too)
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+  }
+}
