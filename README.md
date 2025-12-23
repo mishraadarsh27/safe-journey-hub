@@ -1,3 +1,4 @@
+live link : https://safe-journey-hub.vercel.app/
 # SafeTransit - Women's Safety & Journey Monitoring Hub
 
 SafeTransit is a real-time web application designed to enhance personal safety during travel. It allows users to share their live location with trusted contacts, monitor their journey, and trigger instant SOS alerts in case of emergency.
