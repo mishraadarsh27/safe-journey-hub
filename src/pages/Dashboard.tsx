@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { dbService, Contact, TripData } from "@/services/db";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { AlertTriangle, MapPin, Navigation, Phone, CheckCircle, Share2, Users, Play } from "lucide-react";
 import LiveMap from "@/components/LiveMap";
 import { collection, query, getDocs } from "firebase/firestore";
@@ -19,6 +19,7 @@ const Dashboard = () => {
     const { user } = useAuth();
     const { toast } = useToast();
     const navigate = useNavigate();
+    const location = useLocation();
     const [activeTripId, setActiveTripId] = useState<string | null>(null);
     const [isEmergency, setIsEmergency] = useState(false);
 
@@ -49,8 +50,9 @@ const Dashboard = () => {
         };
         fetchContacts();
 
-        // 2. Check for Active Trip (Persistence)
-        const checkActiveTrip = async () => {
+        // 2. Check for Active Trip OR Passed State
+        const checkState = async () => {
+            // Priority 1: Persistence (Real Active Trip)
             const trip = await dbService.getActiveTrip(user.uid);
             if (trip) {
                 setActiveTripId(trip.id);
@@ -65,8 +67,14 @@ const Dashboard = () => {
                     });
                 }
             }
+            // Priority 2: Passed State from Home Page (Preview Mode)
+            else if (location.state?.targetLocation) {
+                setDestination(location.state.targetLocation);
+                // Clear state so a refresh doesn't re-trigger if user cancels
+                window.history.replaceState({}, document.title);
+            }
         };
-        checkActiveTrip();
+        checkState();
 
     }, [user]);
 
