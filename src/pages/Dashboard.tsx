@@ -14,6 +14,7 @@ import { emailService } from "@/services/email";
 import { DestinationSearch } from "@/components/DestinationSearch";
 import { LocationResult } from "@/services/geocoding";
 import { routingService } from "@/services/routing";
+import { ModeToggle } from "@/components/ModeToggle";
 
 const Dashboard = () => {
     const { user } = useAuth();
@@ -201,64 +202,73 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="min-h-screen bg-background p-4 md:p-8">
-            <div className="container mx-auto max-w-4xl space-y-6">
+        <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-background p-4 md:p-8">
+            <div className="container mx-auto max-w-6xl space-y-8">
 
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold">Active Journey</h1>
-                        <p className="text-muted-foreground">Monitoring your safety</p>
+                <header className="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="text-center md:text-left">
+                        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+                            Active Journey
+                        </h1>
+                        <p className="text-muted-foreground mt-1">Monitoring your safety continuously</p>
                     </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => navigate("/")}>
+                    <div className="flex items-center gap-3">
+                        <ModeToggle />
+                        <Button variant="outline" className="rounded-full shadow-sm hover:shadow-md transition-all" onClick={() => navigate("/")}>
                             Back Home
                         </Button>
                     </div>
-                </div>
+                </header>
 
-                {/* Status Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="p-4 flex items-center space-x-4">
-                        <div className="p-3 bg-primary/10 rounded-full">
+                {/* Status Cards - Premium Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <Card className="glass-card p-5 flex items-center mb-0 border-l-4 border-l-primary/50">
+                        <div className="p-3 bg-primary/10 rounded-full mr-4 shadow-sm">
                             <Navigation className="w-6 h-6 text-primary" />
                         </div>
                         <div>
-                            <p className="text-sm text-muted-foreground">Status</p>
-                            <p className="font-semibold text-lg">{isEmergency ? "EMERGENCY" : activeTripId ? "En Route" : "Ready"}</p>
+                            <p className="text-sm font-medium text-muted-foreground">Journey Status</p>
+                            <p className={`text-xl font-bold tracking-tight ${isEmergency ? "text-destructive" : "text-foreground"}`}>
+                                {isEmergency ? "EMERGENCY" : activeTripId ? "En Route" : "Ready"}
+                            </p>
                         </div>
                     </Card>
 
-                    <Card className="p-4 flex items-center space-x-4">
-                        <div className="p-3 bg-blue-100 rounded-full">
-                            <MapPin className="w-6 h-6 text-blue-600" />
+                    <Card className="glass-card p-5 flex items-center mb-0 border-l-4 border-l-blue-500/50">
+                        <div className="p-3 bg-blue-500/10 rounded-full mr-4 shadow-sm">
+                            <MapPin className="w-6 h-6 text-blue-500" />
                         </div>
-                        <div>
-                            <p className="text-sm text-muted-foreground">Destination</p>
-                            <p className="font-semibold text-lg truncate max-w-[150px]">
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium text-muted-foreground">Destination</p>
+                            <p className="text-xl font-bold text-foreground truncate">
                                 {destination ? destination.name.split(',')[0] : "Not Set"}
                             </p>
                         </div>
                     </Card>
 
-                    <Card className="p-4 flex items-center space-x-4">
-                        <div className={`p-3 rounded-full ${displayLocation ? 'bg-green-100' : 'bg-yellow-100'}`}>
-                            <CheckCircle className={`w-6 h-6 ${displayLocation ? 'text-green-600' : 'text-yellow-600'}`} />
+                    <Card className="glass-card p-5 flex items-center mb-0 border-l-4 border-l-green-500/50">
+                        <div className={`p-3 rounded-full mr-4 shadow-sm ${displayLocation ? 'bg-green-500/10' : 'bg-yellow-500/10'}`}>
+                            <CheckCircle className={`w-6 h-6 ${displayLocation ? 'text-green-500' : 'text-yellow-500'}`} />
                         </div>
                         <div>
-                            <p className="text-sm text-muted-foreground">GPS Signal</p>
-                            <p className={`font-semibold text-lg ${displayLocation ? 'text-green-600 animate-pulse' : 'text-yellow-600'}`}>
-                                {displayLocation ? "Live" : "Searching..."}
+                            <p className="text-sm font-medium text-muted-foreground">GPS Signal</p>
+                            <p className="text-xl font-bold text-foreground">
+                                {displayLocation ?
+                                    <span className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                                        Live <span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>
+                                    </span>
+                                    : "Searching..."}
                             </p>
                         </div>
                     </Card>
                 </div>
 
                 {/* Main Content Area */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
                     {/* Map Area */}
-                    <Card className="lg:col-span-2 min-h-[400px] bg-muted/30 relative overflow-hidden rounded-xl border-0 shadow-sm">
+                    <Card className="lg:col-span-8 h-[500px] lg:h-[600px] bg-muted/50 relative overflow-hidden rounded-2xl border border-white/20 shadow-xl">
                         {displayLocation ? (
                             <LiveMap
                                 position={displayLocation}
@@ -291,42 +301,42 @@ const Dashboard = () => {
                     </Card>
 
                     {/* Controls */}
-                    <div className="space-y-4">
-                        <Card className="p-6">
+                    <div className="lg:col-span-4 space-y-6">
+                        <Card className="glass-card p-6">
                             {!activeTripId ? (
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="text-sm font-medium mb-2 block">Set Destination</label>
+                                        <label className="text-sm font-medium mb-3 block text-foreground/80">Where are you heading?</label>
                                         <DestinationSearch onSelect={handleDestinationSelect} />
                                     </div>
 
                                     <Button
                                         variant="default"
                                         size="lg"
-                                        className="w-full bg-green-600 hover:bg-green-700"
+                                        className="w-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all text-lg h-12 rounded-xl"
                                         onClick={handleStartTrip}
                                         disabled={!destination || !displayLocation}
                                     >
-                                        <Play className="w-4 h-4 mr-2" />
+                                        <Play className="w-5 h-5 mr-2 fill-current" />
                                         Start Journey
                                     </Button>
-                                    {!displayLocation && <p className="text-xs text-yellow-600 text-center">Waiting for GPS...</p>}
+                                    {!displayLocation && <p className="text-xs text-yellow-600 text-center animate-pulse">Waiting for GPS signal...</p>}
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                                        <p className="text-sm text-green-800 font-medium flex items-center gap-2">
+                                    <div className="bg-green-500/10 p-5 rounded-2xl border border-green-500/20">
+                                        <p className="text-sm text-green-700 dark:text-green-400 font-bold flex items-center gap-2 uppercase tracking-wider">
                                             <Navigation className="w-4 h-4" />
-                                            Trip Active
+                                            Active Trip
                                         </p>
-                                        <p className="text-xs text-green-700 mt-1">
-                                            Destination: {destination?.name.split(',')[0]}
+                                        <p className="text-lg text-foreground mt-2 font-medium">
+                                            To: {destination?.name.split(',')[0]}
                                         </p>
                                     </div>
                                     <Button
-                                        variant="default"
+                                        variant="secondary"
                                         size="lg"
-                                        className="w-full"
+                                        className="w-full h-12 text-lg rounded-xl dark:bg-secondary/50 dark:hover:bg-secondary/70"
                                         onClick={handleEndTrip}
                                     >
                                         End Journey
@@ -335,37 +345,40 @@ const Dashboard = () => {
                             )}
                         </Card>
 
-                        <Card className="p-6 space-y-6">
-                            <h3 className="font-semibold text-lg">Emergency Controls</h3>
+                        <Card className="glass-card p-6 space-y-6 border-destructive/20 shadow-red-500/5">
+                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-destructive" />
+                                Emergency Controls
+                            </h3>
 
                             <Button
                                 variant="destructive"
                                 size="lg"
-                                className="w-full h-24 text-xl animate-pulse shadow-red-500/20 shadow-lg hover:shadow-red-500/40 transition-all"
+                                className="w-full h-28 text-2xl font-bold animate-pulse shadow-red-500/30 shadow-xl hover:shadow-red-500/50 hover:scale-[1.02] transition-all rounded-2xl"
                                 onClick={handleSOS}
                             >
-                                <div className="flex flex-col items-center gap-2">
-                                    <AlertTriangle className="w-8 h-8" />
+                                <div className="flex flex-col items-center gap-3">
+                                    <AlertTriangle className="w-10 h-10" />
                                     <span>SOS ALERT</span>
                                 </div>
                             </Button>
 
-                            <Button variant="outline" className="w-full" onClick={handleShare}>
-                                <Share2 className="w-4 h-4 mr-2" />
+                            <Button variant="outline" className="w-full h-12 text-base rounded-xl border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors" onClick={handleShare}>
+                                <Share2 className="w-5 h-5 mr-2" />
                                 Share Live Location
                             </Button>
 
-                            <div className="text-xs text-center text-muted-foreground">
-                                Pressing this will instantly notify {emergencyContacts.length > 0 ? `${emergencyContacts.length} contacts` : "authorities"} with your live location.
+                            <div className="text-xs text-center text-muted-foreground px-4">
+                                Pressing SOS will instantly notify {emergencyContacts.length > 0 ? `${emergencyContacts.length} trusted contacts` : "authorities"}.
                             </div>
 
-                            <div className="pt-4 border-t space-y-2">
-                                <Button variant="secondary" className="w-full" onClick={() => window.open('tel:911')}>
+                            <div className="pt-4 border-t border-border/50 space-y-3">
+                                <Button variant="secondary" className="w-full h-11 rounded-xl" onClick={() => window.open('tel:911')}>
                                     <Phone className="w-4 h-4 mr-2" />
                                     Call Emergency Services
                                 </Button>
-                                <Button variant="ghost" className="w-full text-xs h-8" onClick={() => window.location.href = "/contacts"}>
-                                    <Users className="w-3 h-3 mr-2" />
+                                <Button variant="ghost" className="w-full text-sm h-10 rounded-xl hover:bg-muted font-normal text-muted-foreground" onClick={() => window.location.href = "/contacts"}>
+                                    <Users className="w-4 h-4 mr-2" />
                                     Manage Contacts ({emergencyContacts.length})
                                 </Button>
                             </div>

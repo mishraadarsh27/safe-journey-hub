@@ -133,4 +133,16 @@
   .text-balance {
     text-wrap: balance;
   }
+  
+  .glass {
+    @apply bg-white/70 dark:bg-black/40 backdrop-blur-lg border border-white/20 dark:border-white/10 shadow-lg;
+  }
+  
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-md border border-border/50 shadow-sm transition-all duration-300;
+  }
+  
+  .glass-card:hover {
+    @apply shadow-md -translate-y-[2px] bg-card/90;
+  }
 }
