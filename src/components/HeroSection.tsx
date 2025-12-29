@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { Shield, MapPin, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { dbService } from "@/services/db";
+import { DestinationSearch } from "@/components/DestinationSearch";
+import { LocationResult } from "@/services/geocoding";
 
 import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
-  const [destination, setDestination] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState<LocationResult | null>(null);
   const { user, loginWithGoogle } = useAuth();
   const [isStarting, setIsStarting] = useState(false);
   const navigate = useNavigate();
@@ -24,7 +24,7 @@ const HeroSection = () => {
       return;
     }
 
-    if (!destination.trim()) {
+    if (!selectedLocation) {
       toast({
         title: "Destination required",
         description: "Please enter your destination to start your journey.",
@@ -33,50 +33,19 @@ const HeroSection = () => {
       return;
     }
 
+    // Instead of starting the trip immediately, we navigate to Dashboard with the intent
     setIsStarting(true);
-    try {
-      // Get current location
-      if (!navigator.geolocation) {
-        throw new Error("Geolocation is not supported by your browser");
-      }
 
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        const { latitude, longitude } = position.coords;
-
-        await dbService.startTrip({
-          userId: user.uid,
-          destination,
-          startLocation: { lat: latitude, lng: longitude },
-          status: 'active'
-        });
-
-        toast({
-          title: "Journey Started! 🛡️",
-          description: `We're now monitoring your trip to ${destination}. Stay safe!`,
-        });
-        setIsStarting(false);
-        navigate("/dashboard");
-      }, (error) => {
-        setIsStarting(false); // Ensure loading state is reset on error
-        toast({
-          title: "Error",
-          description: "Location access denied. Please enable GPS.",
-          variant: "destructive",
-        });
-        console.error('Geolocation error:', error);
-      });
-
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    // Check if geolocation is supported (quick check)
+    if (!navigator.geolocation) {
+      toast({ title: "Error", description: "Geolocation not supported", variant: "destructive" });
       setIsStarting(false);
+      return;
     }
-  };
 
-  const isDisabled = !destination.trim() && !!user;
+    // Pass the selected location to the dashboard
+    navigate("/dashboard", { state: { targetLocation: selectedLocation } });
+  };
 
   return (
     <section className="w-full py-12 md:py-20 px-4">
@@ -108,15 +77,8 @@ const HeroSection = () => {
           className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto mb-6 opacity-0 animate-fade-in"
           style={{ animationDelay: "0.3s" }}
         >
-          <div className="relative flex-1">
-            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Where are you going?"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              className="w-full h-14 pl-12 pr-4 text-base rounded-2xl border-2 border-input bg-background focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-            />
+          <div className="relative flex-1 text-left">
+            <DestinationSearch onSelect={setSelectedLocation} />
           </div>
         </div>
 
@@ -132,7 +94,7 @@ const HeroSection = () => {
             disabled={isStarting}
             className={`w-full sm:w-auto min-w-[200px]`}
           >
-            {user ? (isStarting ? "Starting..." : "Start Journey") : "Login to Start"}
+            {user ? (isStarting ? "Processing..." : "Start Journey") : "Login to Start"}
             {!isStarting && <ArrowRight className="w-5 h-5 ml-1" />}
           </Button>
         </div>

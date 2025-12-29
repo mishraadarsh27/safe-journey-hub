@@ -27,6 +27,7 @@ export interface TripData {
     userId: string;
     destination: string;
     startLocation: { lat: number; lng: number };
+    destinationCoordinates?: { lat: number; lng: number };
     status: 'active' | 'completed' | 'emergency';
 }
 
@@ -89,6 +90,21 @@ export const dbService = {
             currentLocation: new GeoPoint(tripData.startLocation.lat, tripData.startLocation.lng)
         });
         return docRef.id;
+    },
+
+    getActiveTrip: async (userId: string) => {
+        if (!userId) return null;
+        const q = query(
+            collection(db, "trips"),
+            where("userId", "==", userId),
+            where("status", "==", "active")
+        );
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
+
+        // Return the most recent active trip if multiple (shouldn't happen with proper logic)
+        const doc = snapshot.docs[0];
+        return { id: doc.id, ...doc.data() } as TripData & { id: string };
     },
 
     updateTripLocation: async (tripId: string, lat: number, lng: number) => {

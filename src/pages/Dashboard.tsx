@@ -11,6 +11,9 @@ import { collection, query, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useLocationTracker } from "@/hooks/useLocationTracker";
 import { emailService } from "@/services/email";
+import { DestinationSearch } from "@/components/DestinationSearch";
+import { LocationResult } from "@/services/geocoding";
+import { routingService } from "@/services/routing";
 
 const Dashboard = () => {
     const { user } = useAuth();
@@ -19,10 +22,15 @@ const Dashboard = () => {
     const [activeTripId, setActiveTripId] = useState<string | null>(null);
     const [isEmergency, setIsEmergency] = useState(false);
 
+    // Journey State
+    const [destination, setDestination] = useState<LocationResult | null>(null);
+    const [routePath, setRoutePath] = useState<[number, number][] | null>(null);
+    const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+
     // Real-time location tracking
     const { location: trackedLocation, error: trackerError } = useLocationTracker(activeTripId);
 
-    // Use tracked location if available, else local state
+    // Use tracked location if available, else local state (for initial view)
     const displayLocation = trackedLocation || null;
     const gpsStatusError = trackerError || null;
 
@@ -31,6 +39,8 @@ const Dashboard = () => {
     // Fetch contacts on load
     useEffect(() => {
         if (!user) return;
+
+        // 1. Load Contacts
         const fetchContacts = async () => {
             const q = query(collection(db, `users/${user.uid}/contacts`));
             const snapshot = await getDocs(q);
@@ -38,31 +48,80 @@ const Dashboard = () => {
             setEmergencyContacts(loaded);
         };
         fetchContacts();
+
+        // 2. Check for Active Trip (Persistence)
+        const checkActiveTrip = async () => {
+            const trip = await dbService.getActiveTrip(user.uid);
+            if (trip) {
+                setActiveTripId(trip.id);
+                if (trip.status === 'emergency') setIsEmergency(true);
+
+                // Restore destination state
+                if (trip.destinationCoordinates) {
+                    setDestination({
+                        name: trip.destination,
+                        lat: trip.destinationCoordinates.lat,
+                        lng: trip.destinationCoordinates.lng
+                    });
+                }
+            }
+        };
+        checkActiveTrip();
+
     }, [user]);
 
+    // Calculate route when destination or location changes
+    // Runs for both "Preview" (no active trip) and "Active Trip" (restoring state)
+    useEffect(() => {
+        if (destination && displayLocation) {
+            // Avoid recalculating if we already have a path that matches (optimization optional, but good)
+            // For now, just recalc to ensure sync
+            const fetchRoute = async () => {
+                setIsCalculatingRoute(true);
+                const route = await routingService.getRoute(
+                    { lat: displayLocation[0], lng: displayLocation[1] },
+                    { lat: destination.lat, lng: destination.lng }
+                );
+                if (route) {
+                    setRoutePath(route.coordinates);
+                }
+                setIsCalculatingRoute(false);
+            };
+            fetchRoute();
+        }
+    }, [destination, displayLocation, activeTripId]);
 
-
-    // Clean up old GPS effect logic as it's now in the hook, but we need initial location for Start Trip
-    // We will let the hook handle updates.
+    const handleDestinationSelect = (location: LocationResult) => {
+        setDestination(location);
+        toast({
+            title: "Destination Set",
+            description: `Route calculating to ${location.name}...`
+        });
+    };
 
     const handleStartTrip = async () => {
         if (!user || activeTripId) return;
 
-        // Get initial location
+        if (!destination) {
+            toast({ title: "Select Destination", description: "Please enter where you are going.", variant: "destructive" });
+            return;
+        }
+
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const { latitude, longitude } = pos.coords;
             try {
                 const tripData: TripData = {
                     userId: user.uid,
-                    destination: "Not Specified", // Could add input for this
+                    destination: destination.name,
                     startLocation: { lat: latitude, lng: longitude },
+                    destinationCoordinates: { lat: destination.lat, lng: destination.lng },
                     status: 'active'
                 };
                 const id = await dbService.startTrip(tripData);
                 setActiveTripId(id);
                 toast({
                     title: "Journey Started",
-                    description: "Your location is now being monitored.",
+                    description: `Monitoring journey to ${destination.name.split(',')[0]}`,
                 });
             } catch (error) {
                 console.error(error);
@@ -74,12 +133,16 @@ const Dashboard = () => {
     };
 
     const handleShare = () => {
-        // Mock share link
-        const link = `https://safetransit.app/track/mock-trip-id`;
-        navigator.clipboard.writeText(link);
+        if (!user) return;
+        // Generate a link that actually points to Google Maps with current coordinates
+        const locationLink = displayLocation
+            ? `https://www.google.com/maps?q=${displayLocation[0]},${displayLocation[1]}`
+            : "Location not available";
+
+        navigator.clipboard.writeText(`I'm sharing my live location: ${locationLink}`);
         toast({
-            title: "Link Copied!",
-            description: "Share this link with friends/family to track you.",
+            title: "Location Copied!",
+            description: "Paste it in WhatsApp or SMS to share.",
         });
     };
 
@@ -87,12 +150,12 @@ const Dashboard = () => {
         if (!user) return;
         try {
             setIsEmergency(true);
-            // Use current location or default
             const location = displayLocation
                 ? { lat: displayLocation[0], lng: displayLocation[1] }
                 : { lat: 0, lng: 0 };
 
-            await dbService.triggerSOS("current-trip-id", user.uid, location, emergencyContacts);
+            await dbService.triggerSOS(activeTripId || "emergency-only", user.uid, location, emergencyContacts);
+            await emailService.sendSOS(user.displayName || "User", location, emergencyContacts);
 
             toast({
                 title: "SOS ACTIVATED",
@@ -101,12 +164,16 @@ const Dashboard = () => {
             });
         } catch (error) {
             console.error(error);
+            toast({ title: "Error", description: "Failed to send SOS.", variant: "destructive" });
         }
     };
 
     const handleEndTrip = async () => {
         try {
-            // await dbService.endTrip("current-trip-id");
+            // await dbService.endTrip(activeTripId); // Uncomment when implemented
+            setActiveTripId(null);
+            setDestination(null);
+            setRoutePath(null);
             toast({
                 title: "Journey Completed",
                 description: "You have arrived safely.",
@@ -150,7 +217,7 @@ const Dashboard = () => {
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">Status</p>
-                            <p className="font-semibold text-lg">{isEmergency ? "EMERGENCY" : "En Route"}</p>
+                            <p className="font-semibold text-lg">{isEmergency ? "EMERGENCY" : activeTripId ? "En Route" : "Ready"}</p>
                         </div>
                     </Card>
 
@@ -160,17 +227,21 @@ const Dashboard = () => {
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">Destination</p>
-                            <p className="font-semibold text-lg">Central Plaza</p> {/* Dynamic in real app */}
+                            <p className="font-semibold text-lg truncate max-w-[150px]">
+                                {destination ? destination.name.split(',')[0] : "Not Set"}
+                            </p>
                         </div>
                     </Card>
 
                     <Card className="p-4 flex items-center space-x-4">
-                        <div className="p-3 bg-green-100 rounded-full">
-                            <CheckCircle className="w-6 h-6 text-green-600" />
+                        <div className={`p-3 rounded-full ${displayLocation ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                            <CheckCircle className={`w-6 h-6 ${displayLocation ? 'text-green-600' : 'text-yellow-600'}`} />
                         </div>
                         <div>
-                            <p className="text-sm text-muted-foreground">Safety Check</p>
-                            <p className="font-semibold text-lg text-green-600 animate-pulse">Live</p>
+                            <p className="text-sm text-muted-foreground">GPS Signal</p>
+                            <p className={`font-semibold text-lg ${displayLocation ? 'text-green-600 animate-pulse' : 'text-yellow-600'}`}>
+                                {displayLocation ? "Live" : "Searching..."}
+                            </p>
                         </div>
                     </Card>
                 </div>
@@ -179,10 +250,13 @@ const Dashboard = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                     {/* Map Area */}
-                    {/* Map Area */}
                     <Card className="lg:col-span-2 min-h-[400px] bg-muted/30 relative overflow-hidden rounded-xl border-0 shadow-sm">
                         {displayLocation ? (
-                            <LiveMap position={displayLocation} />
+                            <LiveMap
+                                position={displayLocation}
+                                destination={destination ? [destination.lat, destination.lng] : undefined}
+                                routePath={routePath || undefined}
+                            />
                         ) : (
                             <div className="flex items-center justify-center h-full p-6 text-center">
                                 {gpsStatusError ? (
@@ -210,6 +284,49 @@ const Dashboard = () => {
 
                     {/* Controls */}
                     <div className="space-y-4">
+                        <Card className="p-6">
+                            {!activeTripId ? (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-sm font-medium mb-2 block">Set Destination</label>
+                                        <DestinationSearch onSelect={handleDestinationSelect} />
+                                    </div>
+
+                                    <Button
+                                        variant="default"
+                                        size="lg"
+                                        className="w-full bg-green-600 hover:bg-green-700"
+                                        onClick={handleStartTrip}
+                                        disabled={!destination || !displayLocation}
+                                    >
+                                        <Play className="w-4 h-4 mr-2" />
+                                        Start Journey
+                                    </Button>
+                                    {!displayLocation && <p className="text-xs text-yellow-600 text-center">Waiting for GPS...</p>}
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+                                        <p className="text-sm text-green-800 font-medium flex items-center gap-2">
+                                            <Navigation className="w-4 h-4" />
+                                            Trip Active
+                                        </p>
+                                        <p className="text-xs text-green-700 mt-1">
+                                            Destination: {destination?.name.split(',')[0]}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="default"
+                                        size="lg"
+                                        className="w-full"
+                                        onClick={handleEndTrip}
+                                    >
+                                        End Journey
+                                    </Button>
+                                </div>
+                            )}
+                        </Card>
+
                         <Card className="p-6 space-y-6">
                             <h3 className="font-semibold text-lg">Emergency Controls</h3>
 
@@ -245,29 +362,6 @@ const Dashboard = () => {
                                 </Button>
                             </div>
                         </Card>
-
-                        <Card className="p-6">
-                            {!activeTripId ? (
-                                <Button
-                                    variant="default"
-                                    size="lg"
-                                    className="w-full bg-green-600 hover:bg-green-700"
-                                    onClick={handleStartTrip}
-                                >
-                                    <Play className="w-4 h-4 mr-2" />
-                                    Start Journey
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="default"
-                                    size="lg"
-                                    className="w-full"
-                                    onClick={handleEndTrip}
-                                >
-                                    End Journey
-                                </Button>
-                            )}
-                        </Card>
                     </div>
 
                 </div>
@@ -276,11 +370,10 @@ const Dashboard = () => {
                 <div className="mt-8 p-4 bg-black/5 rounded-lg text-xs font-mono text-muted-foreground">
                     <p className="font-bold mb-2">Diagnostic Info:</p>
                     <p>GPS Status: {gpsStatusError ? "Error" : displayLocation ? "Active" : "Searching..."}</p>
-                    {gpsStatusError && <p className="text-destructive">Error Details: {gpsStatusError}</p>}
                     <p>Latitude: {displayLocation?.[0] || 'N/A'}</p>
                     <p>Longitude: {displayLocation?.[1] || 'N/A'}</p>
-                    <p>User ID: {user?.uid || 'Not Logged In'}</p>
-                    <p>Map Service: OpenStreetMap (Leaflet)</p>
+                    <p>Destination: {destination ? destination.name : "None"}</p>
+                    <p>Route Points: {routePath ? routePath.length : 0}</p>
                 </div>
             </div>
         </div>
