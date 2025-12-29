@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -114,7 +114,7 @@
   .card-interactive {
     @apply transition-all duration-200 ease-out;
   }
-  
+
   .card-interactive:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-elevated);
@@ -133,15 +133,15 @@
   .text-balance {
     text-wrap: balance;
   }
-  
+
   .glass {
     @apply bg-white/70 dark:bg-black/40 backdrop-blur-lg border border-white/20 dark:border-white/10 shadow-lg;
   }
-  
+
   .glass-card {
     @apply bg-card/80 backdrop-blur-md border border-border/50 shadow-sm transition-all duration-300;
   }
-  
+
   .glass-card:hover {
     @apply shadow-md -translate-y-[2px] bg-card/90;
   }
